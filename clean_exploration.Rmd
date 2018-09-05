@@ -1,0 +1,94 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+
+sales <- read_csv("sales.csv")
+sales %>% head()
+
+```
+
+- `X1` seems to be a useless identifier, can remove.
+- Various event identifiers don't help us much, can remove.
+- Plenty of missing values.
+- Plenty of date columns. 
+
+Will look at the stucture of the data and understand the missing values.
+
+```{r}
+glimpse(sales)
+
+```
+The date columns have a mix of data types, some are date, date-time or chars. 
+
+Let's count the missing values per column.
+
+```{r}
+sales %>%
+  lapply(is.na) %>%
+  sapply(sum)
+
+```
+
+The last 14 columns are almost entirely missing values, so we'll remove them. Also the `web_session_cookie_val` column doesn't provide much use, we'll remove it too.
+
+```{r}
+
+sales2 <- sales %>%
+  select(event_name:fin_mkt_nm)
+
+```
+
+
+```{r}
+glimpse(sales2)
+```
+
+Let's clean up the dates and date-times. I'll split the dttm fields into a date and time. Then will ensure all date and time fields have the correct type. 
+
+```{r}
+sales3 <- separate(sales2, event_date_time,
+                   c("event_dt", "event_time"), sep = " ")
+
+sales4 <- separate(sales3, sales_ord_create_dttm,
+                   c("ord_create_dt", "ord_create_time"), sep = " ")
+
+```
+
+```{r}
+glimpse(sales4)
+```
+
+All the date fields end in `dt`, all the time fields now end in `time`. Let's exploit this to change their type.
+
+```{r}
+date_cols <- str_detect(names(sales4), "dt")
+time_cols <- c("event_time", "ord_create_time")
+
+library(lubridate)
+sales4[, date_cols] <- lapply(sales4[, date_cols], ymd)
+sales4[, time_cols] <- lapply(sales4[, time_cols], hms)
+glimpse(sales4)
+```
+
+```{r}
+head(sales4$ord_create_time)
+```
+
+I noticed that some fields have NULL, some have NA for missing values. Let's check both and decide how to we can resolve these.
+
+```{r}
+sales4[, str_detect(sales4, "NULL")]
+```
+
+```{r}
+
+sales4$secondary_act_name <- str_replace(sales4$secondary_act_name, "NULL", "None")
+sales4$sales_platform_cd <- str_replace(sales4$sales_platform_cd, "NULL", "None")
+
+```
+
+
